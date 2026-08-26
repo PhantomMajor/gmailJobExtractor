@@ -4,7 +4,7 @@ Gmail JobSearch Extractor
 --------------------------
 Extracts structured job data (Role, Company, Location, Experience) from
 JobSearch-labeled emails (LinkedIn Job Alerts, Hirist.tech) and marks
-successfully-processed emails with a "ReadyToDelete" Gmail label.
+successfully-processed emails with a "delete" Gmail label.
 
 Setup:
 1. In Google Cloud Console: create/select a project, enable the "Gmail API",
@@ -15,7 +15,7 @@ Setup:
    First run opens a browser for OAuth consent; token.json is cached after
    that, so subsequent runs don't need a browser.
 
-Idempotency: emails that already carry the ReadyToDelete label are excluded
+Idempotency: emails that already carry the delete label are excluded
 from the next run's query, so it's safe to re-run this repeatedly (e.g. as a
 cron job or later as a Claude routine) without re-processing or duplicating
 JSON entries.
@@ -46,7 +46,7 @@ CREDENTIALS_FILE = "credentials.json"
 TOKEN_FILE = "token.json"
 
 SOURCE_LABEL = "JobSearch"
-DONE_LABEL = "ReadyToDelete"
+DONE_LABEL = "delete"
 
 OUTPUT_FILE = "extracted_jobs.json"
 
@@ -152,20 +152,41 @@ def extract_body(payload):
 
 # -------------------------------------------------------------- Parsing ----
 
+MAX_FIELD_LEN = 80  # real role/company/location text is short; URLs and
+                     # footer boilerplate ("Manage your job alerts: https://...")
+                     # are not, so this doubles as a noise filter.
+
+
+def _looks_like_noise(s):
+    s_lower = s.lower()
+    return (
+        "http://" in s_lower
+        or "https://" in s_lower
+        or len(s) > MAX_FIELD_LEN
+        or s_lower.startswith(("unsubscribe", "manage your job alert", "help", "view job", "see all jobs"))
+    )
+
+
 def parse_job_blocks(text):
     """Scans lines for a 'Company · [Experience ·] Location' detail line
     (the '·' separated pattern seen in both LinkedIn and Hirist bodies) and
-    takes the preceding non-empty line as the Role."""
+    takes the preceding non-empty line as the Role.
+
+    LinkedIn's own footer ("Manage your job alerts · Unsubscribe · Help")
+    uses the same '·' separator, so every candidate line/part is screened
+    with _looks_like_noise() to reject links and boilerplate before being
+    accepted as a job."""
+
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     jobs = []
     for i, line in enumerate(lines):
-        if "·" not in line:
+        if "·" not in line or _looks_like_noise(line):
             continue
         parts = [p.strip() for p in line.split("·") if p.strip()]
-        if not (2 <= len(parts) <= 3):
+        if not (2 <= len(parts) <= 3) or any(_looks_like_noise(p) for p in parts):
             continue
         role = lines[i - 1] if i > 0 else ""
-        if not role or "·" in role:
+        if not role or "·" in role or _looks_like_noise(role):
             continue
         company = parts[0]
         experience, location = "", ""
@@ -257,6 +278,11 @@ def main():
         if not jobs:
             skipped_no_jobs += 1
             continue  # recognized sender but parse failed: leave for manual review
+
+        # Drop any stale entries for this message before adding fresh ones,
+        # so re-running after a label reset never leaves old/bad data
+        # sitting alongside the corrected extraction.
+        records = [r for r in records if r.get("message_id") != msg_id]
 
         for job in jobs:
             records.append({
