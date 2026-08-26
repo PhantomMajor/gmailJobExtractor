@@ -1,0 +1,11 @@
+# Virtual Environment
+.venv/
+
+# Sensitive Google API Credentials and Cached Tokens
+credentials.json
+token.json
+
+# Extracted Jobs Output and Temp Files
+extracted_jobs.json
+*.json.tmp
+*.tmp
