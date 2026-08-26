@@ -1,48 +1,138 @@
-# Gmail JobSearch Extractor
+```
+╭─────────────────────────────────────────╮
+│  📧 Gmail Job Extractor                 │
+│  Automate your job hunting emails       │
+╰─────────────────────────────────────────╯
+```
 
-## Setup
+Stop copy-pasting job listings. Let this script do it for you.
 
-1. **Google Cloud project**
-   - Go to console.cloud.google.com, create (or pick) a project.
-   - Enable the **Gmail API** (APIs & Services -> Library).
-   - Configure the OAuth consent screen as "External" + "Testing", add your
-     own Gmail address as a test user (no Google review needed for personal use).
-   - Create credentials -> OAuth client ID -> Application type: **Desktop app**.
-   - Download the JSON, save it as `credentials.json` next to the script.
+## ✨ What it does
 
-2. **Install dependencies**
-   ```
+```
+┌─────────────────┐
+│   Gmail Inbox   │  (With JobSearch label)
+└────────┬────────┘
+         │
+         ↓
+┌──────────────────────────┐
+│  gmail_job_extractor.py  │  Identifies sender & extracts jobs
+└────────┬─────────────────┘
+         │
+         ├─→ Finds: Role, Company, Location, Experience
+         │
+         ↓
+┌──────────────────────────┐
+│  extracted_jobs.json     │  Structured job data (JSON)
+└──────────────────────────┘
+         ↑
+         │
+         └─ Emails auto-labeled "ReadyToDelete"
+```
+
+**The payoff?** 54 job emails extracted and organized in seconds. No manual copy-pasting.
+
+### Supported senders (for now)
+- ✅ LinkedIn Job Alerts
+- ✅ Hirist
+
+---
+
+## 📸 See it in action
+
+**Before:** 54 emails in your inbox waiting to be processed  
+![Gmail inbox with 54 job emails](screenshots/gmail_processed.jpeg)
+
+**After:** Structured job data in `extracted_jobs.json`, ready to use or delete  
+![Extracted jobs in VSCode](screenshots/extracted_jobs_output.jpeg)
+
+---
+
+## 🚀 Quick Start
+
+### 1. Google Cloud setup
+   - Go to [console.cloud.google.com](https://console.cloud.google.com), create or pick a project
+   - Enable the **Gmail API** (APIs & Services → Library)
+   - Configure OAuth consent screen: "External" + "Testing", add your Gmail as test user (no review needed!)
+   - Create credentials → OAuth client ID → **Desktop app**
+   - Download JSON, save as `credentials.json` in this repo
+
+### 2. Install dependencies
+   ```bash
    pip install -r requirements.txt
    ```
 
-3. **Run**
-   ```
+### 3. Run
+   ```bash
    python gmail_job_extractor.py
    ```
-   First run opens a browser to approve access; approve with the same
-   account that has the `JobSearch` label. This creates `token.json`, which
-   is reused (and auto-refreshed) on later runs — no repeated browser login.
+   First run opens a browser for approval (same account with `JobSearch` label). Creates `token.json` for future runs—no repeated logins.
 
-## What it does
+---
 
-- Finds all emails with the Gmail label `JobSearch` that don't yet have the
-  `ReadyToDelete` label.
-- Identifies the sender (LinkedIn Job Alerts / Hirist) and extracts every
-  job listing in the email body: Role, Company, and (if present) Location
-  and Years of Experience — all as strings.
-- Appends results to `extracted_jobs.json`.
-- Adds the `ReadyToDelete` label to any email it successfully extracted
-  from. **Nothing is deleted** — that's a manual/phase-2 step.
+## 🎯 How it works
 
-## Edge case behavior
+**On each run:**
+- Scans Gmail for emails labeled `JobSearch` (without `ReadyToDelete`)
+- Parses job listings from the email body
+- Appends to `extracted_jobs.json`
+- Marks processed emails with `ReadyToDelete` label
 
-- Sender not LinkedIn/Hirist -> skipped, label untouched.
-- Sender recognized but nothing matched the parsing pattern (e.g. the
-  template changed) -> skipped, label untouched, so you can spot it in your
-  `JobSearch` label and adjust the parser or review manually.
+**Edge cases:**
+- Unknown sender? Skipped, label stays clean (you'll spot it manually)
+- Parser didn't match anything? Skipped, label untouched (template may have changed—time to adjust)
 
-## Extending to a new sender
+---
 
-Add a `parse_<sender>(text, subject)` function returning a list of
-`{"role", "company", "location", "experience"}` dicts, and register its
-sender domain in the `PARSERS` dict.
+## 🛠 Extend to a new sender
+
+1. Create a `parse_<sender>(text, subject)` function
+2. Return a list of dicts: `{"role", "company", "location", "experience"}`
+3. Register the sender domain in the `PARSERS` dict
+
+---
+
+## 🗺 Roadmap (v1.* planned)
+
+These are coming soon—no API tokens needed, just smarter automation:
+
+- [ ] **v1.1** | Swap JSON for SQLite database (better for large datasets)
+- [ ] **v1.2** | Auto-delete without human-in-loop (the script marks emails for deletion, not just labeling)
+- [ ] **v1.3** | Add cron job support (runs on a schedule, no manual trigger)
+
+Each keeps the same simple, token-free workflow. This is just the beginning.
+
+---
+
+## 🤝 Contributing
+
+This is v1, and there's a lot of room to grow. Here's how you can help:
+
+### Ideas
+- Add support for new job email senders (Indeed, Wellfound, etc.)
+- Improve parsing accuracy or add new fields (e.g., salary, job type)
+- Test edge cases and report bugs
+- Share your roadmap ideas
+
+### Code contributions
+1. **Fork & branch** (`feature/new-sender`, `fix/parser-bug`, etc.)
+2. **Test your changes** (run the script, verify `extracted_jobs.json`)
+3. **Open a PR** with a description of what you changed and why
+4. **Add screenshots** (use `blur_screenshots.py` to hide sensitive info):
+   ```bash
+   python blur_screenshots.py before.png after.png \
+     --regions 10,50,500,30 600,100,200,50
+   ```
+
+No experience needed—if you're fixing something that bothered you, that's a great PR.
+
+---
+
+## 📝 License
+
+Yours to use, modify, and share. Build on it!
+
+---
+
+**Questions?** [Open an issue](../../issues). **Found a bug?** Same place.  
+**Built something cool with this?** Let me know—I'd love to see it!
