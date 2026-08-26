@@ -125,7 +125,14 @@ def decode_part(data):
 
 def extract_body(payload):
     """Best-effort plain text body: prefer text/plain, else strip tags from
-    text/html while preserving line breaks (job listings are line-oriented)."""
+    text/html while preserving line breaks (job listings are line-oriented).
+
+    Some senders (e.g. Hirist) ship a text/plain part that's just a stub
+    like "Please Enable HTML" for clients that don't render HTML, with all
+    real content only in text/html. A plain part that short is treated as
+    a placeholder and skipped in favor of the HTML part."""
+    PLACEHOLDER_MAX_LEN = 60
+
     plain_result, html_result = None, None
     stack = [payload]
     while stack:
@@ -138,7 +145,7 @@ def extract_body(payload):
             html_result = decode_part(body["data"])
         stack.extend(part.get("parts", []))
 
-    if plain_result:
+    if plain_result and len(plain_result.strip()) > PLACEHOLDER_MAX_LEN:
         return plain_result
     if html_result:
         soup = BeautifulSoup(html_result, "html.parser")
@@ -147,7 +154,7 @@ def extract_body(payload):
         text = soup.get_text("\n")
         lines = [l.strip() for l in text.splitlines()]
         return "\n".join(l for l in lines if l)
-    return ""
+    return plain_result or ""
 
 
 # -------------------------------------------------------------- Parsing ----
