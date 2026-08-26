@@ -1,11 +1,19 @@
 # Virtual Environment
 .venv/
+venv/
 
-# Sensitive Google API Credentials and Cached Tokens
+# Python cache
+__pycache__/
+*.pyc
+
+# Sensitive credentials
 credentials.json
 token.json
 
-# Extracted Jobs Output and Temp Files
+# Generated output
 extracted_jobs.json
-*.json.tmp
 *.tmp
+
+# IDE
+.vscode/
+.DS_Store

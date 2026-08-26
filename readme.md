@@ -64,7 +64,7 @@ Stop copy-pasting job listings. Let this script do it for you.
 
 ### 3. Run
    ```bash
-   python gmail_job_extractor.py
+   python src/gmailJobExtractor.py
    ```
    First run opens a browser for approval (same account with `JobSearch` label). Creates `token.json` for future runs—no repeated logins.
 
@@ -89,6 +89,8 @@ Stop copy-pasting job listings. Let this script do it for you.
 1. Create a `parse_<sender>(text, subject)` function
 2. Return a list of dicts: `{"role", "company", "location", "experience"}`
 3. Register the sender domain in the `PARSERS` dict
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed steps.
 
 ---
 
@@ -118,11 +120,6 @@ This is v1, and there's a lot of room to grow. Here's how you can help:
 1. **Fork & branch** (`feature/new-sender`, `fix/parser-bug`, etc.)
 2. **Test your changes** (run the script, verify `extracted_jobs.json`)
 3. **Open a PR** with a description of what you changed and why
-4. **Add screenshots** (use `blur_screenshots.py` to hide sensitive info):
-   ```bash
-   python blur_screenshots.py before.png after.png \
-     --regions 10,50,500,30 600,100,200,50
-   ```
 
 No experience needed—if you're fixing something that bothered you, that's a great PR.
 
@@ -130,7 +127,7 @@ No experience needed—if you're fixing something that bothered you, that's a gr
 
 ## 📝 License
 
-Yours to use, modify, and share. Build on it!
+MIT License - See [LICENSE](LICENSE) for details. Yours to use, modify, and share. Build on it!
 
 ---
 
