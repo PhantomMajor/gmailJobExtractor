@@ -218,10 +218,64 @@ def parse_hirist(text, subject):
     return parse_job_blocks(text)
 
 
+def parse_naukri(text, subject):
+    """
+    Parse Naukri job cards. Card format (from screenshot):
+    [Role Title]
+    [Company Name] [Rating - optional]
+    [Location]
+
+    Only extracts roles containing "product" (case-insensitive).
+    """
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    jobs = []
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        # Look for a line containing "product" (the role)
+        if "product" not in line.lower():
+            i += 1
+            continue
+
+        role = line
+        company = ""
+        location = ""
+
+        # Collect next lines as company and location
+        # Company is usually next line (may contain rating: "★ 3.6")
+        if i + 1 < len(lines):
+            company_line = lines[i + 1]
+            # Remove rating patterns like "★ 3.6" or "⭐ 3.6"
+            company = re.sub(r'[★⭐]\s*[\d.]+', '', company_line).strip()
+
+        # Location is usually after company (may have emoji prefix)
+        if i + 2 < len(lines):
+            loc_line = lines[i + 2]
+            # Skip lines that look like UI elements (e.g., "Not Interested")
+            if "not interested" not in loc_line.lower() and "get app" not in loc_line.lower():
+                location = loc_line.strip()
+
+        # Add job if we found both role and company
+        if company:
+            jobs.append({
+                "role": role,
+                "company": company,
+                "location": location,
+                "experience": ""
+            })
+
+        i += 1
+
+    return jobs
+
+
 PARSERS = {
     "linkedin.com": parse_linkedin,
     "hirist.tech": parse_hirist,
     "hirist.com": parse_hirist,
+    "naukri.com": parse_naukri,
 }
 
 
