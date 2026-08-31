@@ -17,3 +17,6 @@ extracted_jobs.json
 # IDE
 .vscode/
 .DS_Store
+
+# Claude folder
+.claude/
