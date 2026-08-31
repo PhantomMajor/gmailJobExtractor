@@ -38,4 +38,3 @@ python gmailJobExtractor.py --export extracted_jobs.json
 CREATE TABLE schema_version (version INTEGER);
 INSERT INTO schema_version VALUES (1);  -- on init, check this before queries
 ```
-6. Keep the same CLI output — users shouldn't notice the storage layer changed.

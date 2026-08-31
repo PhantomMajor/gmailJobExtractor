@@ -12,6 +12,7 @@ token.json
 
 # Generated output
 extracted_jobs.json
+jobs.db
 *.tmp
 
 # IDE

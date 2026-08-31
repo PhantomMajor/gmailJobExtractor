@@ -23,14 +23,16 @@ Stop copy-pasting job listings. Let this script do it for you.
          │
          ↓
 ┌──────────────────────────┐
-│  extracted_jobs.json     │  Structured job data (JSON)
+│  jobs.db (SQLite)        │  Structured job data (Database)
 └──────────────────────────┘
          ↑
          │
-         └─ Emails auto-labeled "ReadyToDelete"
+         └─ Emails auto-labeled "delete"
 ```
 
-**The payoff?** 54 job emails extracted and organized in seconds. No manual copy-pasting.
+**The payoff?** 54 job emails extracted and organized in seconds. No manual copy-pasting. Query and export data anytime.
+
+**New in v1.1:** SQLite database for better scalability, data querying, and the `--debug` & `--export` flags for transparency and portability.
 
 ### Supported senders (for now)
 - ✅ LinkedIn Job Alerts
@@ -66,7 +68,13 @@ Stop copy-pasting job listings. Let this script do it for you.
    ```bash
    python src/gmailJobExtractor.py
    ```
-   First run opens a browser for approval (same account with `JobSearch` label). Creates `token.json` for future runs—no repeated logins.
+   First run opens a browser for approval (same account with `JobSearch` label). Creates `token.json` for future runs—no repeated logins. Jobs are stored in `jobs.db` (SQLite).
+
+### 4. Optional flags
+   ```bash
+   python src/gmailJobExtractor.py --debug        # Print extracted records before saving to DB
+   python src/gmailJobExtractor.py --export out.json  # Export all jobs from DB to JSON
+   ```
 
 ---
 
@@ -98,7 +106,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed steps.
 
 These are coming soon—no API tokens needed, just smarter automation:
 
-- [ ] **v1.1** | Swap JSON for SQLite database (better for large datasets)
+- [x] **v1.1** | Swap JSON for SQLite database (better for large datasets) — _now live with `--debug` & `--export` flags_
 - [ ] **v1.2** | Auto-delete without human-in-loop (the script marks emails for deletion, not just labeling)
 - [ ] **v1.3** | Add cron job support (runs on a schedule, no manual trigger)
 
