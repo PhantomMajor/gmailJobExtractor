@@ -26,14 +26,13 @@ Behavior on edge cases (see README for rationale):
   so you can review it manually instead of silently losing data.
 """
 
+import argparse
 import base64
-import json
 import os
 import re
 import sys
 from pathlib import Path
 from typing import Any
-
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -41,14 +40,14 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from bs4 import BeautifulSoup
 
+from db import init_db, upsert_job, load_jobs_for_export, export_to_json, get_existing_message_ids
+
 SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 CREDENTIALS_FILE = "credentials.json"
 TOKEN_FILE = "token.json"
 
 SOURCE_LABEL = "JobSearch"
 DONE_LABEL = "delete"
-
-OUTPUT_FILE = "extracted_jobs.json"
 
 EXPERIENCE_RE = re.compile(r"\d+\s*[-–to]+\s*\d+\s*\+?\s*(?:yrs?|years?)", re.I)
 
@@ -239,78 +238,97 @@ def match_parser(from_header):
 
 
 # --------------------------------------------------------------- Output ----
-
-def load_existing_output():
-    if os.path.exists(OUTPUT_FILE):
-        try:
-            return json.loads(Path(OUTPUT_FILE).read_text())
-        except json.JSONDecodeError:
-            return []
-    return []
-
-
-def save_output(records):
-    tmp = OUTPUT_FILE + ".tmp"
-    Path(tmp).write_text(json.dumps(records, indent=2, ensure_ascii=False))
-    os.replace(tmp, OUTPUT_FILE)  # atomic swap, avoids a half-written file on crash
-
+# earlier used to output a JSON object with list of jobs
 
 # ----------------------------------------------------------------- Main ----
 
-def main():
+def main(args):
+    # Handle export-only mode
+    if args.export:
+        export_to_json(args.export)
+        print(f"Exported jobs to {args.export}")
+        return
+
+    # Initialize DB
+    init_db()
+
     service: Any = get_service()
     source_label_id = get_or_create_label(service, SOURCE_LABEL)
     done_label_id = get_or_create_label(service, DONE_LABEL)
 
-    message_ids = list_unprocessed_messages(service, source_label_id, done_label_id)
-    print(f"Found {len(message_ids)} unprocessed JobSearch emails.")
+    done_ids = set(list_message_ids_for_label(service, done_label_id))
+    unprocessed_ids = (set(list_message_ids_for_label(service, source_label_id)) - done_ids)
 
-    records = load_existing_output()
+    print(f"Found {len(unprocessed_ids)} unprocessed JobSearch emails.")
+
+    jobs_to_insert = []
+    processed_msg_ids = []
     processed = skipped_unrecognized = skipped_no_jobs = 0
 
-    for msg_id in message_ids:
+    for msg_id in unprocessed_ids:
         msg = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
-        
+
         headers = msg["payload"]["headers"]
         from_header = get_header(headers, "From")
-        subject = get_header(headers, "Subject")
         date = get_header(headers, "Date")
 
         parser = match_parser(from_header)
         if not parser:
             skipped_unrecognized += 1
-            continue  # unrecognized sender: leave label untouched, per spec
+            continue
 
-        jobs = parser(extract_body(msg["payload"]), subject)
+        jobs = parser(extract_body(msg["payload"]), get_header(headers, "Subject"))
         if not jobs:
             skipped_no_jobs += 1
-            continue  # recognized sender but parse failed: leave for manual review
-
-        # Drop any stale entries for this message before adding fresh ones,
-        # so re-running after a label reset never leaves old/bad data
-        # sitting alongside the corrected extraction.
-        records = [r for r in records if r.get("message_id") != msg_id]
+            continue
 
         for job in jobs:
-            records.append({
+            record = {
                 "message_id": msg_id,
                 "sender": from_header,
                 "date": date,
-                "subject": subject,
                 **job,
-            })
+            }
+            jobs_to_insert.append(record)
 
-        service.users().messages().modify(
-            userId="me", id=msg_id, body={"addLabelIds": [done_label_id]}
-        ).execute()
+        processed_msg_ids.append(msg_id)
         processed += 1
 
-    save_output(records)
-    print(f"Processed: {processed} | Unrecognized sender: {skipped_unrecognized} | "
+    # Debug: print records before committing
+    if args.debug and jobs_to_insert:
+        print("\n" + "="*70)
+        print("DEBUG: Jobs extracted (before DB commit):")
+        print("="*70)
+        for i, job in enumerate(jobs_to_insert, 1):
+            print(f"\n[{i}]")
+            for key, val in job.items():
+                print(f"  {key}: {val}")
+        print("\n" + "="*70 + "\n")
+
+    # Commit to DB
+    for record in jobs_to_insert:
+        upsert_job(record)
+
+    # Mark emails as done
+    if processed_msg_ids:
+        service.users().messages().batchModify(
+            userId="me",
+            body={
+                "ids": processed_msg_ids,
+                "addLabelIds": [done_label_id]
+            }
+        ).execute()
+
+    all_jobs = load_jobs_for_export()
+    print(f"\nProcessed: {processed} | Unrecognized sender: {skipped_unrecognized} | "
           f"No jobs parsed: {skipped_no_jobs}")
-    print(f"Extracted {len(records)} total job entries -> {OUTPUT_FILE}")
+    print(f"Total job entries in DB: {len(all_jobs)}")
     print(f"Marked {processed} emails with '{DONE_LABEL}' label.")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Extract jobs from Gmail JobSearch emails")
+    parser.add_argument("--debug", action="store_true", help="Print extracted records before committing to DB")
+    parser.add_argument("--export", metavar="FILE", help="Export all jobs to JSON file (no Gmail fetch)")
+    args = parser.parse_args()
+    main(args)
