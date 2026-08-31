@@ -23,7 +23,7 @@ def init_db():
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            message_id TEXT UNIQUE NOT NULL,
+            message_id TEXT NOT NULL,
             sender TEXT NOT NULL,
             date TEXT,
 
@@ -36,7 +36,9 @@ def init_db():
             metadata TEXT,
 
             extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            UNIQUE(message_id, role, company)
         );
 
         CREATE INDEX IF NOT EXISTS idx_company ON jobs(company);
@@ -47,7 +49,7 @@ def init_db():
 
 
 def upsert_job(record: Dict[str, Any]) -> None:
-    """Insert or replace a job record (by message_id)."""
+    """Insert or replace a job record (by message_id, role, company combination)."""
     conn = get_connection()
     conn.execute("PRAGMA foreign_keys = ON")
 
@@ -55,11 +57,9 @@ def upsert_job(record: Dict[str, Any]) -> None:
         INSERT INTO jobs (
             message_id, sender, date, role, company, location, experience, interested, metadata
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(message_id) DO UPDATE SET
+        ON CONFLICT(message_id, role, company) DO UPDATE SET
             sender = excluded.sender,
             date = excluded.date,
-            role = excluded.role,
-            company = excluded.company,
             location = excluded.location,
             experience = excluded.experience,
             updated_at = CURRENT_TIMESTAMP

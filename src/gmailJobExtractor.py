@@ -219,9 +219,10 @@ def parse_hirist(text, subject):
 
 def parse_naukri(text, subject):
     """
-    Parse Naukri job cards. Card format (from screenshot):
+    Parse Naukri job cards. Actual format extracted from HTML:
     [Role Title]
-    [Company Name] [Rating - optional]
+    [Company Name]
+    [Rating - just a number like "4.0"]
     [Location]
 
     Only extracts roles containing "product" (case-insensitive).
@@ -242,18 +243,20 @@ def parse_naukri(text, subject):
         company = ""
         location = ""
 
-        # Collect next lines as company and location
-        # Company is usually next line (may contain rating: "★ 3.6")
+        # Next line is company
         if i + 1 < len(lines):
-            company_line = lines[i + 1]
-            # Remove rating patterns like "★ 3.6" or "⭐ 3.6"
-            company = re.sub(r'[★⭐]\s*[\d.]+', '', company_line).strip()
+            company = lines[i + 1].strip()
 
-        # Location is usually after company (may have emoji prefix)
-        if i + 2 < len(lines):
-            loc_line = lines[i + 2]
-            # Skip lines that look like UI elements (e.g., "Not Interested")
-            if "not interested" not in loc_line.lower() and "get app" not in loc_line.lower():
+        # Skip rating line (line i+2) and get location (line i+3)
+        # Rating is usually a number like "4.0" or "3.8"
+        if i + 3 < len(lines):
+            loc_line = lines[i + 3]
+            # Skip lines that look like UI elements
+            if not (
+                "not interested" in loc_line.lower()
+                or "get app" in loc_line.lower()
+                or "are these jobs" in loc_line.lower()
+            ):
                 location = loc_line.strip()
 
         # Add job if we found both role and company
