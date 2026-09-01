@@ -2,20 +2,11 @@
 
 I was overwhelmed by the number of job board notification emails coming in my inbox. Too many unheard of companies (startups, etc.) and too many senders (LinkedIn, Hireist, Naurki, etc.).
 
-My biggest pain was that I did not know which of these companies was I interested in, and should network with more. Now that I write this, I realise that an easier workflow would be laizzes faire, where I just go through my email (with the label= JobSearch), individually read about companies, and start 1) applying, 2) networking with people in them.
+My biggest pain was that I did not know which of these companies was I interested in, and should network with more. Now that I write this, I realise that an easier workflow would be laissez-faire, where I just go through my email (with the label= JobSearch), individually read about companies, and start 1) applying, 2) networking with people in them.
 
 However, considering the large amount of noise in these emails, I decided to just write this basic scrapper in python.
 
 ## ✨ What it does
-
-1. One-time connect securely to your Gmail app (read access only). This is just like any other app where there is an SSO screen and you log in via gmail.
-
-2. Once connected, and script is run, it reads emails with the label `JobSearch`. This is a simple label to narrow down what the script reads.
-   * You can create a `JobSearch` label within Gmail.
-
-3. Once read, the script identifies sender and extracts job postings (role, company, etc.) and stores it in the `jobs.db` sqlite database.
-
-4. Finally, the emails that have been catured, are labelled `delete` so that user can review & delete these in bulk without going through them.
 
 ```
 ┌─────────────────┐
@@ -37,8 +28,6 @@ However, considering the large amount of noise in these emails, I decided to jus
          │
          └─ Emails auto-labeled "delete"
 ```
-
-**New in v1.1:** SQLite database for better scalability, data querying, and the `--debug` & `--export` flags for transparency and portability.
 
 ### Supported senders (for now)
 - ✅ LinkedIn Job Alerts
@@ -137,14 +126,7 @@ python src/gmailJobExtractor.py --export out.json  # Save all jobs to a JSON fil
 
 ## 🗺 Roadmap (v1.* planned)
 
-These are coming soon—no API tokens needed, just smarter automation:
-
-|version|feature|note|
-|---|---|---|
-|**v1.1**|Swap JSON for SQLite database (better for large datasets).|_Now live with `--debug` & `--export` flags_|
-|**v1.2**|Auto-delete without human-in-loop (the script marks emails for deletion, not just labeling)|not yet started|
-|**v1.3**|Add cron job support (runs on a schedule, no manual trigger)|-|
-
+Detailed roadmap present [here](docs/ROADMAP.md).
 
 ## 🤝 Contributing
 This is v1, and there's a lot of room to grow. Here's how you can help:
