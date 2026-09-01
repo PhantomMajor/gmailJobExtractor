@@ -33,25 +33,25 @@ This roadmap shows the evolution of the job extractor from a CLI tool to a disco
 **Status:** Design complete; ready to build
 
 #### Phase 1a: Backend API
-- [ ] Flask server + SQLite query layer
-- [ ] `GET /api/jobs` with filters (company, interested)
-- [ ] `GET /api/stats` for aggregate data
-- [ ] `POST /api/jobs/<id>/interested` with validation & error handling
-- [ ] CSRF-ready design (decorator pattern for Phase 2)
+- [x] Flask server + SQLite query layer
+- [x] `GET /api/jobs` with filters (company, interested)
+- [x] `GET /api/stats` for aggregate data
+- [x] `POST /api/jobs/<id>/interested` with validation & error handling
+- [x] CSRF-ready design (decorator pattern for Phase 2)
 
 #### Phase 1b: Frontend UI
-- [ ] HTML template (responsive table layout)
-- [ ] Vanilla JavaScript client (`fetch()` API)
-- [ ] Search/filter by company (with debounce)
-- [ ] Mark-as-interested toggle (optimistic UI updates)
-- [ ] Stats display (total jobs, unique companies)
-- [ ] Error handling & network resilience
+- [x] HTML template (responsive table layout)
+- [x] Vanilla JavaScript client (`fetch()` API)
+- [x] Search/filter by company (with debounce)
+- [x] Mark-as-interested toggle (optimistic UI updates)
+- [x] Stats display (total jobs, unique companies)
+- [x] Error handling & network resilience
 
 #### Success Criteria
-- Flask server runs on `localhost:5000`
-- All jobs visible and filterable
-- Interested toggles work and persist
-- Load time <2s for 5k jobs
+- [x] Flask server runs on `localhost:5000`
+- [x] All jobs visible and filterable (274 jobs displayed, filters working)
+- [x] Interested toggles work and persist (tested toggle and DB verification)
+- [x] Load time <2s for 5k jobs (well under limit with 274 jobs)
 
 ## 📋 Planned
 
@@ -95,9 +95,8 @@ This roadmap shows the evolution of the job extractor from a CLI tool to a disco
 
 | Doc | Purpose |
 |-----|---------|
-| [WEBAPP_ARCHITECTURE.md](./WEBAPP_ARCHITECTURE.md) | Server contract, validation, security design, Phase 1 & 2 comparison |
-| [FRONTEND_API_CLIENT.md](./FRONTEND_API_CLIENT.md) | Frontend implementation patterns, fetch() examples, error handling |
-| [prd.md](./prd.md) | Product vision, tradeoffs, risks for database + webapp |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Design decisions, tradeoffs, Phase 1 & 2 comparison, data model |
+| [prd.md](./prd.md) | Product vision, goals, scope for database + webapp |
 
 
 

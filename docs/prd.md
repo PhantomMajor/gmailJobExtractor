@@ -46,7 +46,7 @@ INSERT INTO schema_version VALUES (1);  -- on init, check this before queries
 ## Vision
 Build a searchable web interface to explore extracted jobs locally, with an option to scale to cloud (Vercel + Turso) for always-on access.
 
-For detailed architecture, validation, and security design, see [WEBAPP_ARCHITECTURE.md](./WEBAPP_ARCHITECTURE.md) and [FRONTEND_API_CLIENT.md](./FRONTEND_API_CLIENT.md).
+For architecture decisions and design rationale, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Phase 1: Local Webapp (MVP)
 

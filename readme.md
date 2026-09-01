@@ -124,6 +124,60 @@ python src/gmailJobExtractor.py --debug        # Show what the script extracted 
 python src/gmailJobExtractor.py --export out.json  # Save all jobs to a JSON file
 ```
 
+---
+
+## 💼 Job Dashboard - Web Interface
+
+Once you have jobs extracted to `jobs.db`, you can browse them in an interactive web dashboard.
+
+### Running the Dashboard
+
+#### 1. Start the Flask server
+```bash
+python run.py
+```
+The server will start on `http://localhost:5000`. Open your browser and navigate there to see the dashboard.
+
+#### 2. Stop the server
+Press `Ctrl+C` in the terminal
+
+### Features
+
+- **View all jobs** extracted from Gmail in a searchable table
+- **Filter by company** with live search (debounced)
+- **Three-state job evaluation:**
+  - **? Not Evaluated** (gray) — initial state, untouched by user
+  - **✓ Interested** (green) — you're interested in this job
+  - **✗ Not Interested** (red) — you explicitly rejected this job
+  - *Once you click, the job cycles between interested/not interested (never returns to unevaluated)*
+- **View statistics** (total jobs, unique companies, marked interested)
+- **Responsive design** that works on desktop and mobile
+
+### How it works
+
+- **Backend**: Flask (Python) web server with SQLite database
+- **Frontend**: Vanilla HTML + JavaScript (zero dependencies, no build step)
+- **API**: Simple REST endpoints (GET jobs, GET stats, POST to toggle interested)
+
+### Troubleshooting
+
+**Port 5000 already in use?**
+```bash
+# Kill the process using port 5000
+lsof -i :5000 | grep LISTEN | awk '{print $2}' | xargs kill -9
+```
+
+**Database locked?**
+SQLite uses file-level locking. Make sure only one Flask server is running.
+
+**No jobs showing?**
+Run the extractor first:
+```bash
+python src/gmailJobExtractor.py
+```
+
+---
+
 ## 🗺 Roadmap (v1.* planned)
 
 Detailed roadmap present [here](docs/ROADMAP.md).
