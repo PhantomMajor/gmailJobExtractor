@@ -41,6 +41,7 @@ from googleapiclient.discovery import build
 from bs4 import BeautifulSoup
 
 from db import init_db, upsert_job, load_jobs_for_export, export_to_json, get_existing_message_ids
+from parsers import parse_linkedin, parse_hirist, parse_naukri
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 CREDENTIALS_FILE = "credentials.json"
@@ -48,8 +49,6 @@ TOKEN_FILE = "token.json"
 
 SOURCE_LABEL = "JobSearch"
 DONE_LABEL = "delete"
-
-EXPERIENCE_RE = re.compile(r"\d+\s*[-–to]+\s*\d+\s*\+?\s*(?:yrs?|years?)", re.I)
 
 
 # ---------------------------------------------------------------- Auth ----
@@ -157,121 +156,6 @@ def extract_body(payload):
 
 
 # -------------------------------------------------------------- Parsing ----
-
-MAX_FIELD_LEN = 80  # real role/company/location text is short; URLs and
-                     # footer boilerplate ("Manage your job alerts: https://...")
-                     # are not, so this doubles as a noise filter.
-
-
-def _looks_like_noise(s):
-    s_lower = s.lower()
-    return (
-        "http://" in s_lower
-        or "https://" in s_lower
-        or len(s) > MAX_FIELD_LEN
-        or s_lower.startswith(("unsubscribe", "manage your job alert", "help", "view job", "see all jobs"))
-    )
-
-
-def parse_job_blocks(text):
-    """Scans lines for a 'Company · [Experience ·] Location' detail line
-    (the '·' separated pattern seen in both LinkedIn and Hirist bodies) and
-    takes the preceding non-empty line as the Role.
-
-    LinkedIn's own footer ("Manage your job alerts · Unsubscribe · Help")
-    uses the same '·' separator, so every candidate line/part is screened
-    with _looks_like_noise() to reject links and boilerplate before being
-    accepted as a job."""
-
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    jobs = []
-    for i, line in enumerate(lines):
-        if "·" not in line or _looks_like_noise(line):
-            continue
-        parts = [p.strip() for p in line.split("·") if p.strip()]
-        if not (2 <= len(parts) <= 3) or any(_looks_like_noise(p) for p in parts):
-            continue
-        role = lines[i - 1] if i > 0 else ""
-        if not role or "·" in role or _looks_like_noise(role):
-            continue
-        company = parts[0]
-        experience, location = "", ""
-        for p in parts[1:]:
-            if EXPERIENCE_RE.search(p):
-                experience = p
-            else:
-                location = p
-        jobs.append({"role": role, "company": company, "location": location, "experience": experience})
-    return jobs
-
-
-def parse_linkedin(text, subject):
-    jobs = parse_job_blocks(text)
-    if not jobs and " at " in subject:
-        role, company = subject.split(" at ", 1)
-        jobs = [{"role": role.strip(), "company": company.strip(), "location": "", "experience": ""}]
-    return jobs
-
-
-def parse_hirist(text, subject):
-    return parse_job_blocks(text)
-
-
-def parse_naukri(text, subject):
-    """
-    Parse Naukri job cards. Actual format extracted from HTML:
-    [Role Title]
-    [Company Name]
-    [Rating - just a number like "4.0"]
-    [Location]
-
-    Only extracts roles containing "product" (case-insensitive).
-    """
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    jobs = []
-
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-
-        # Look for a line containing "product" (the role)
-        if "product" not in line.lower():
-            i += 1
-            continue
-
-        role = line
-        company = ""
-        location = ""
-
-        # Next line is company
-        if i + 1 < len(lines):
-            company = lines[i + 1].strip()
-
-        # Skip rating line (line i+2) and get location (line i+3)
-        # Rating is usually a number like "4.0" or "3.8"
-        if i + 3 < len(lines):
-            loc_line = lines[i + 3]
-            # Skip lines that look like UI elements
-            if not (
-                "not interested" in loc_line.lower()
-                or "get app" in loc_line.lower()
-                or "are these jobs" in loc_line.lower()
-            ):
-                location = loc_line.strip()
-
-        # Add job if we found both role and company
-        if company:
-            jobs.append({
-                "role": role,
-                "company": company,
-                "location": location,
-                "experience": ""
-            })
-
-        i += 1
-
-    return jobs
-
 
 PARSERS = {
     "linkedin.com": parse_linkedin,

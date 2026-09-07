@@ -152,12 +152,82 @@ DELETE FROM jobs WHERE interested = 0;
 DELETE FROM jobs;
 ```
 
-### Cleanup
+### Cleanup Malformed Data
 ```sql
--- Remove duplicate entries (if any)
+-- ===== OPTION 1: Clear malformed location fields (SAFE - RECOMMENDED) =====
+
+-- Clear ratings (e.g., "3.8", "4.1", "5.0") from location field
+UPDATE jobs
+SET location = ''
+WHERE location REGEXP '^\d+\.\d+$';
+
+-- Clear durations (e.g., "6-7 Months") from location field
+UPDATE jobs
+SET location = ''
+WHERE location REGEXP '^\d+[\s\-]*(?:to|–|-)\s*\d+\s*(?:months?|weeks?|days?)' COLLATE NOCASE;
+
+-- Clear boilerplate text (e.g., "Hi Udayaditya,", "Get App") from location field
+UPDATE jobs
+SET location = ''
+WHERE LOWER(location) IN ('hi udayaditya,', 'get app', 'not interested')
+   OR LOWER(location) LIKE 'hi %'
+   OR LOWER(location) LIKE 'hello %'
+   OR LOWER(location) LIKE 'dear %';
+
+-- ===== OPTION 2: Delete entire malformed job entries (DESTRUCTIVE) =====
+
+-- View jobs that would be deleted (preview before deleting)
+SELECT id, role, company, location, sender
+FROM jobs
+WHERE location REGEXP '^\d+\.\d+$'
+   OR location REGEXP '^\d+[\s\-]*(?:to|–|-)\s*\d+\s*(?:months?|weeks?|days?)'
+   OR LOWER(location) IN ('hi udayaditya,', 'get app');
+
+-- Delete entire job records with malformed locations
+DELETE FROM jobs
+WHERE location REGEXP '^\d+\.\d+$'
+   OR location REGEXP '^\d+[\s\-]*(?:to|–|-)\s*\d+\s*(?:months?|weeks?|days?)'
+   OR LOWER(location) IN ('hi udayaditya,', 'get app', 'not interested')
+   OR LOWER(location) LIKE 'hi %'
+   OR LOWER(location) LIKE 'hello %'
+   OR LOWER(location) LIKE 'dear %';
+
+-- ===== Remove duplicate entries (if any) =====
 DELETE FROM jobs WHERE id NOT IN (
   SELECT MIN(id) FROM jobs GROUP BY message_id
 );
+```
+
+### Analyze Data Quality
+```sql
+-- Find all malformed locations
+SELECT location, COUNT(*) as count
+FROM jobs
+WHERE location IS NOT NULL
+  AND location != ''
+  AND (location REGEXP '^\d+\.\d+$'
+       OR location REGEXP '^\d+[\s\-]*(?:to|–|-)\s*\d+\s*(?:months?|weeks?|days?)'
+       OR LOWER(location) IN ('hi udayaditya,', 'get app', 'not interested'))
+GROUP BY location
+ORDER BY count DESC;
+
+-- Malformed entries by source (Naukri, Hirist, LinkedIn, etc.)
+SELECT sender, COUNT(*) as malformed_count
+FROM jobs
+WHERE location IS NOT NULL
+  AND location != ''
+  AND (location REGEXP '^\d+\.\d+$'
+       OR location REGEXP '^\d+[\s\-]*(?:to|–|-)\s*\d+\s*(?:months?|weeks?|days?)')
+GROUP BY sender
+ORDER BY malformed_count DESC;
+
+-- Data quality report
+SELECT
+  COUNT(*) as total_jobs,
+  COUNT(CASE WHEN location = '' OR location IS NULL THEN 1 END) as empty_locations,
+  COUNT(CASE WHEN location != '' THEN 1 END) as filled_locations,
+  ROUND(COUNT(CASE WHEN location != '' THEN 1 END) * 100.0 / COUNT(*), 1) as fill_rate
+FROM jobs;
 ```
 
 ---
@@ -175,13 +245,35 @@ SELECT role, company, location, interested FROM jobs;
 EOF
 ```
 
-### Backup
+### Backup & Restore
 ```bash
 # Backup database
 cp jobs.db jobs.db.backup
 
 # Backup with timestamp
 cp jobs.db "jobs.db.backup.$(date +%Y%m%d_%H%M%S)"
+
+# List all backups
+ls -lh jobs.db.backup*
+
+# Restore from backup (WARNING: overwrites current database!)
+cp jobs.db.backup jobs.db
+```
+
+### SQL Backup (Create & Restore)
+```sql
+-- CREATE backup table before cleanup
+CREATE TABLE jobs_backup AS SELECT * FROM jobs;
+
+-- Verify backup was created
+SELECT COUNT(*) as backup_count FROM jobs_backup;
+
+-- RESTORE from backup (delete current, copy back)
+DELETE FROM jobs;
+INSERT INTO jobs SELECT * FROM jobs_backup;
+
+-- Clean up backup table when done
+DROP TABLE jobs_backup;
 ```
 
 ### Use Python Export
