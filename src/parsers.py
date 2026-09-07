@@ -17,12 +17,32 @@ MAX_FIELD_LEN = 80
 def _looks_like_noise(s: str) -> bool:
     """Check if a string is noise (URLs, boilerplate, etc.)"""
     s_lower = s.lower()
+    noise_patterns = [
+        "http://", "https://",
+        "unsubscribe", "manage your job alert", "help", "view job", "see all jobs",
+        "your job alert", "new jobs match", "preferences",
+        "©", "linkedin corporation", "registered trademark",
+        "2026 linkedin", "1zwnj",  # LinkedIn copyright/legal footer
+        "view job:", "apply", "learn more",
+        "pro tip", "note:", "info:", "tip:",  # Common metadata labels
+    ]
     return (
-        "http://" in s_lower
-        or "https://" in s_lower
-        or len(s) > MAX_FIELD_LEN
-        or s_lower.startswith(("unsubscribe", "manage your job alert", "help", "view job", "see all jobs"))
+        len(s) > MAX_FIELD_LEN
+        or any(pattern in s_lower for pattern in noise_patterns)
+        or s.endswith(":")  # Reject labels like "Pro Tip:"
     )
+
+
+def _looks_like_role(s: str) -> bool:
+    """Validate that a string looks like a job role, not metadata/skill list."""
+    if not s or len(s) < 3:
+        return False
+    # Reject if it looks like a comma-separated skill list
+    # (more than 2 commas usually means it's a list, not a role title)
+    comma_count = s.count(",")
+    if comma_count > 2:
+        return False
+    return True
 
 
 def _is_valid_location(s: str) -> bool:
@@ -30,7 +50,16 @@ def _is_valid_location(s: str) -> bool:
     if not s or RATING_RE.match(s) or DURATION_RE.match(s):
         return False
     s_lower = s.lower()
-    if any(keyword in s_lower for keyword in ["get app", "not interested", "hi ", "hello ", "dear "]):
+    invalid_keywords = [
+        "get app", "not interested", "hi ", "hello ", "dear ",
+        "unsubscribe", "manage preferences", "privacy", "copyright",
+        "linkedin corporation", "actively hiring", "4 connections",
+        "view job", "apply now", "save job", "report", "similar",
+    ]
+    if any(keyword in s_lower for keyword in invalid_keywords):
+        return False
+    # Location should have at least 2 chars
+    if len(s) < 2:
         return False
     return True
 
@@ -65,8 +94,12 @@ def parse_linkedin(text: str, subject: str) -> List[Dict[str, str]]:
             i += 1
             continue
 
+        # Skip if line looks like a role/company but is too short (likely junk)
+        if len(line) < 3:
+            i += 1
+            continue
+
         # Look for pattern: Role → Company → Location
-        # Role is typically followed by company on next line, then location
         role = line
         company = ""
         location = ""
@@ -78,7 +111,7 @@ def parse_linkedin(text: str, subject: str) -> List[Dict[str, str]]:
 
         if i < len(lines):
             company = lines[i].strip()
-            if _looks_like_noise(company) or company.startswith("---"):
+            if _looks_like_noise(company) or company.startswith("---") or len(company) < 2:
                 i += 1
                 continue
 
@@ -93,8 +126,13 @@ def parse_linkedin(text: str, subject: str) -> List[Dict[str, str]]:
             if not (potential_location.startswith("---") or _looks_like_noise(potential_location)):
                 location = potential_location
 
-        # Add job if we have role and company
-        if role and company and not _looks_like_noise(role) and not _looks_like_noise(company):
+        # Add job only if we have role and company, they look valid, and role contains "Product"
+        if (role and company and
+            not _looks_like_noise(role) and
+            not _looks_like_noise(company) and
+            _looks_like_role(role) and
+            len(company) > 2 and
+            "product" in role.lower()):
             jobs.append({
                 "role": role,
                 "company": company,
@@ -165,7 +203,10 @@ def parse_hirist(text: str, subject: str) -> List[Dict[str, str]]:
                 if not _is_valid_location(location):
                     location = ""
 
-                if role and company and not _looks_like_noise(company):
+                if (role and company and
+                    not _looks_like_noise(company) and
+                    _looks_like_role(role) and
+                    "product" in role.lower()):
                     jobs.append({
                         "role": role,
                         "company": company,
@@ -285,8 +326,11 @@ def parse_naukri(text: str, subject: str) -> List[Dict[str, str]]:
             if _is_valid_location(potential_loc):
                 location = potential_loc
 
-        # Only add if we have valid role and company
-        if role and company and not _looks_like_noise(company):
+        # Only add if we have valid role and company, and role contains "Product"
+        if (role and company and
+            not _looks_like_noise(company) and
+            _looks_like_role(role) and
+            "product" in role.lower()):
             jobs.append({
                 "role": role,
                 "company": company,

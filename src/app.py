@@ -47,8 +47,8 @@ def api_stats():
 
 
 @app.route("/api/jobs/<job_id>/interested", methods=["POST"])
-def api_toggle_interested(job_id):
-    """Toggle interested flag for a job (cycles: NULL -> 1 -> 0 -> NULL)."""
+def api_set_interested(job_id):
+    """Set interested state for a job."""
     try:
         # Validate job_id is integer
         try:
@@ -56,19 +56,20 @@ def api_toggle_interested(job_id):
         except ValueError:
             return jsonify({"error": "Invalid job ID format"}), 400
 
-        # Verify job exists and get current state
-        conn = db.get_connection()
-        cursor = conn.execute("SELECT interested FROM jobs WHERE id = ?", (job_id_int,))
-        row = cursor.fetchone()
-        if not row:
-            conn.close()
+        # Get new state from request body
+        data = request.get_json() or {}
+        new_state = data.get("interested")
+
+        # Validate interested value is None, 0, or 1
+        if new_state is not None and new_state not in (0, 1):
+            return jsonify({"error": "Invalid interested value"}), 400
+
+        # Set the state and fetch result
+        result = db.set_interested(job_id_int, new_state)
+        if result is None:
             return jsonify({"error": "Job not found"}), 404
-        conn.close()
 
-        # Toggle and fetch result
-        new_state = db.toggle_interested(job_id_int)
-
-        return jsonify({"id": job_id_int, "interested": new_state}), 200
+        return jsonify({"id": job_id_int, "interested": result}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

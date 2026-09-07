@@ -113,18 +113,9 @@ function createJobRow(job) {
   const row = document.createElement("tr");
   row.setAttribute("data-job-id", job.id);
 
-  // Get button text and class based on state: null, 1, or 0
-  let buttonText, buttonClass;
-  if (job.interested === null) {
-    buttonText = "? Not Evaluated";
-    buttonClass = "btn-interested";
-  } else if (job.interested === 1) {
-    buttonText = "✓ Interested";
-    buttonClass = "btn-interested interested";
-  } else { // job.interested === 0
-    buttonText = "✗ Not Interested";
-    buttonClass = "btn-interested not-interested";
-  }
+  const isNeutral = job.interested === null;
+  const isInterested = job.interested === 1;
+  const isNotInterested = job.interested === 0;
 
   row.innerHTML = `
     <td class="role">${escapeHtml(job.role)}</td>
@@ -133,9 +124,11 @@ function createJobRow(job) {
     <td>${escapeHtml(job.experience || "—")}</td>
     <td class="date">${job.date || "—"}</td>
     <td>
-      <button class="${buttonClass}" onclick="handleToggleInterested(${job.id})">
-        ${buttonText}
-      </button>
+      <div class="btn-group-vertical">
+        <button class="btn-state neutral ${isNeutral ? 'active' : ''}" onclick="handleSetInterested(${job.id}, null)">?</button>
+        <button class="btn-state interested ${isInterested ? 'active' : ''}" onclick="handleSetInterested(${job.id}, 1)">✓</button>
+        <button class="btn-state not-interested ${isNotInterested ? 'active' : ''}" onclick="handleSetInterested(${job.id}, 0)">✗</button>
+      </div>
     </td>
   `;
 
@@ -143,41 +136,34 @@ function createJobRow(job) {
 }
 
 /**
- * Toggle interested flag for a job
+ * Set interested state for a job
  */
-async function handleToggleInterested(jobId) {
+async function handleSetInterested(jobId, newState) {
   const row = document.querySelector(`[data-job-id="${jobId}"]`);
-  const button = row.querySelector(".btn-interested");
+  const buttons = row.querySelectorAll(".btn-state");
 
-  // Get current state from button classes
-  let currentState;
-  if (button.classList.contains("interested")) {
-    currentState = 1; // Interested
-  } else if (button.classList.contains("not-interested")) {
-    currentState = 0; // Not Interested
-  } else {
-    currentState = null; // Not Evaluated
-  }
+  // Get current state
+  let currentState = null;
+  buttons.forEach(btn => {
+    if (btn.classList.contains("active")) {
+      if (btn.classList.contains("neutral")) currentState = null;
+      else if (btn.classList.contains("interested")) currentState = 1;
+      else if (btn.classList.contains("not-interested")) currentState = 0;
+    }
+  });
 
-  // Predict next state (optimistic update)
-  // Cycle: null -> 1 -> 0 -> 1 -> 0 -> ... (never back to null once touched)
-  let nextState;
-  if (currentState === null) {
-    nextState = 1; // null -> 1 (Interested, first touch)
-  } else if (currentState === 1) {
-    nextState = 0; // 1 -> 0 (Not Interested)
-  } else {
-    nextState = 1; // 0 -> 1 (Interested)
-  }
+  // If already in desired state, don't do anything
+  if (currentState === newState) return;
 
   // Optimistically update UI
-  updateButtonState(button, nextState);
-  button.disabled = true;
+  updateButtonStates(buttons, newState);
+  buttons.forEach(btn => btn.disabled = true);
 
   try {
     const response = await fetch(`/api/jobs/${jobId}/interested`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interested: newState })
     });
 
     if (!response.ok) {
@@ -187,37 +173,35 @@ async function handleToggleInterested(jobId) {
     const data = await response.json();
 
     // Confirm server state and update UI
-    updateButtonState(button, data.interested);
+    updateButtonStates(buttons, data.interested);
 
     // Update stats
     loadStats();
 
   } catch (error) {
-    console.error("Failed to toggle interested:", error);
+    console.error("Failed to update interested:", error);
 
     // Revert optimistic update
-    updateButtonState(button, currentState);
+    updateButtonStates(buttons, currentState);
     showError(`Failed to update job ${jobId}`);
 
   } finally {
-    button.disabled = false;
+    buttons.forEach(btn => btn.disabled = false);
   }
 }
 
-function updateButtonState(button, state) {
-  // Update button text and classes based on state
-  button.classList.remove("interested", "not-interested");
+function updateButtonStates(buttons, state) {
+  // Clear all active states
+  buttons.forEach(btn => btn.classList.remove("active"));
 
-  if (state === null) {
-    button.textContent = "? Not Evaluated";
-    // No special class for not-evaluated (default gray)
-  } else if (state === 1) {
-    button.textContent = "✓ Interested";
-    button.classList.add("interested");
-  } else { // state === 0
-    button.textContent = "✗ Not Interested";
-    button.classList.add("not-interested");
-  }
+  // Set active state for the appropriate button
+  buttons.forEach(btn => {
+    if ((state === null && btn.classList.contains("neutral")) ||
+        (state === 1 && btn.classList.contains("interested")) ||
+        (state === 0 && btn.classList.contains("not-interested"))) {
+      btn.classList.add("active");
+    }
+  });
 }
 
 /**

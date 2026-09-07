@@ -164,37 +164,67 @@
             font-size: 13px;
         }
 
-        .btn-interested {
-            padding: 6px 12px;
+        .btn-group-vertical {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-state {
+            padding: 6px 10px;
             border: 1px solid #ddd;
             background: white;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             transition: all 0.2s;
             white-space: nowrap;
+            flex: 1;
+            text-align: center;
         }
 
-        .btn-interested:hover {
+        .btn-state:hover {
             border-color: #007bff;
-            color: #007bff;
         }
 
-        .btn-interested.interested {
+        .btn-state:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-state.neutral {
+            background: #f0f0f0;
+            color: #666;
+            border-color: #ddd;
+        }
+
+        .btn-state.neutral.active {
+            background: #6c757d;
+            color: white;
+            border-color: #6c757d;
+        }
+
+        .btn-state.interested {
+            background: white;
+            color: #28a745;
+            border-color: #28a745;
+        }
+
+        .btn-state.interested.active {
             background: #28a745;
             color: white;
             border-color: #28a745;
         }
 
-        .btn-interested.not-interested {
-            background: #dc3545;
-            color: white;
+        .btn-state.not-interested {
+            background: white;
+            color: #dc3545;
             border-color: #dc3545;
         }
 
-        .btn-interested:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .btn-state.not-interested.active {
+            background: #dc3545;
+            color: white;
+            border-color: #dc3545;
         }
 
         .loading {
@@ -296,7 +326,7 @@
                         <th style="width: 15%;">Location</th>
                         <th style="width: 10%;">Experience</th>
                         <th style="width: 12%;">Date</th>
-                        <th style="width: 18%;">Action</th>
+                        <th style="width: 18%;">Status</th>
                     </tr>
                 </thead>
                 <tbody id="jobs-tbody">

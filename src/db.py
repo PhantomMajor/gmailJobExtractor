@@ -221,3 +221,34 @@ def toggle_interested(job_id: int) -> Optional[int]:
     conn.close()
 
     return new_state
+
+
+def set_interested(job_id: int, new_state: Optional[int]) -> Optional[int]:
+    """
+    Set interested state for a job directly.
+
+    Args:
+        job_id: The job ID to update
+        new_state: 1 (interested), 0 (not interested), or None (not evaluated)
+
+    Returns:
+        The new state: 1, 0, or None
+        None if job not found
+    """
+    conn = get_connection()
+
+    # Verify job exists before updating
+    cursor = conn.execute("SELECT interested FROM jobs WHERE id = ?", (job_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+
+    conn.execute(
+        "UPDATE jobs SET interested = ? WHERE id = ?",
+        (new_state, job_id)
+    )
+    conn.commit()
+    conn.close()
+
+    return new_state
