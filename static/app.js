@@ -21,6 +21,9 @@ function setupEventListeners() {
   const companyInput = document.getElementById("company-filter");
   const btnAll = document.getElementById("btn-all");
   const btnInterested = document.getElementById("btn-interested");
+  const btnCompanies = document.getElementById("btn-companies");
+  const modal = document.getElementById("companies-modal");
+  const modalClose = document.getElementById("modal-close");
 
   // Company filter with debounce
   companyInput.addEventListener("input", (e) => {
@@ -46,6 +49,22 @@ function setupEventListeners() {
     btnInterested.classList.add("active");
     btnAll.classList.remove("active");
     loadJobs();
+  });
+
+  // View companies modal
+  btnCompanies.addEventListener("click", () => {
+    modal.style.display = "block";
+    loadCompanies();
+  });
+
+  modalClose.addEventListener("click", () => {
+    modal.style.display = "none";
+  });
+
+  window.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      modal.style.display = "none";
+    }
   });
 }
 
@@ -240,6 +259,59 @@ async function loadStats() {
   } catch (error) {
     console.error("Failed to load stats:", error);
   }
+}
+
+/**
+ * Load unique companies from API
+ */
+async function loadCompanies() {
+  try {
+    const response = await fetch("/api/companies");
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    renderCompanies(data.companies || []);
+
+  } catch (error) {
+    console.error("Failed to load companies:", error);
+    const list = document.getElementById("companies-list");
+    list.innerHTML = `<li class="company-item"><span style="color: #dc3545;">Failed to load companies</span></li>`;
+  }
+}
+
+/**
+ * Render unique companies list
+ */
+function renderCompanies(companies) {
+  const list = document.getElementById("companies-list");
+
+  if (companies.length === 0) {
+    list.innerHTML = `<li class="company-item"><span>No companies found</span></li>`;
+    return;
+  }
+
+  list.innerHTML = companies.map(company => `
+    <li class="company-item" onclick="filterByCompany('${escapeHtml(company.company)}')">
+      <span class="company-name">${escapeHtml(company.company)}</span>
+      <span class="company-count">${company.count} job${company.count !== 1 ? 's' : ''}</span>
+    </li>
+  `).join("");
+}
+
+/**
+ * Filter jobs by company and close modal
+ */
+function filterByCompany(company) {
+  document.getElementById("company-filter").value = company;
+  currentFilter.company = company;
+  currentFilter.interested = false;
+  document.getElementById("btn-all").classList.add("active");
+  document.getElementById("btn-interested").classList.remove("active");
+  loadJobs();
+  document.getElementById("companies-modal").style.display = "none";
 }
 
 /**

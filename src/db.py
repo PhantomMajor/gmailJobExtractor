@@ -221,3 +221,24 @@ def toggle_interested(job_id: int) -> Optional[int]:
     conn.close()
 
     return new_state
+
+
+def get_companies() -> List[Dict[str, Any]]:
+    """
+    Get all unique companies with their job counts.
+
+    Returns a list of dicts with 'company' and 'count' keys, sorted by count descending.
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+
+    cursor = conn.execute("""
+        SELECT company, COUNT(*) as count
+        FROM jobs
+        GROUP BY company
+        ORDER BY count DESC
+    """)
+
+    companies = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return companies

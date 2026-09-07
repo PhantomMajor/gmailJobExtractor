@@ -224,6 +224,111 @@
             color: #666;
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.2s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 70vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9f9f9;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .company-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .company-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .company-item:hover {
+            background: #f9f9f9;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+
+        .company-item:last-child {
+            border-bottom: none;
+        }
+
+        .company-name {
+            font-weight: 500;
+            color: #007bff;
+        }
+
+        .company-count {
+            background: #e9ecef;
+            color: #495057;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
         @media (max-width: 768px) {
             table {
                 font-size: 13px;
@@ -280,9 +385,24 @@
                 <div class="btn-group">
                     <button id="btn-all" class="active">All Jobs</button>
                     <button id="btn-interested">Interested Only</button>
+                    <button id="btn-companies">📊 View Companies</button>
                 </div>
             </div>
         </header>
+
+        <div id="companies-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Unique Companies</h2>
+                    <button class="modal-close" id="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <ul class="company-list" id="companies-list">
+                        <li class="company-item"><span>Loading...</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
 
         <div id="error-container"></div>
 

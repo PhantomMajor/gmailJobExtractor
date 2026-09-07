@@ -46,6 +46,16 @@ def api_stats():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/companies", methods=["GET"])
+def api_companies():
+    """Get all unique companies with their job counts."""
+    try:
+        companies = db.get_companies()
+        return jsonify({"companies": companies}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/jobs/<job_id>/interested", methods=["POST"])
 def api_toggle_interested(job_id):
     """Toggle interested flag for a job (cycles: NULL -> 1 -> 0 -> NULL)."""
