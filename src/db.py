@@ -48,35 +48,74 @@ def init_db():
     conn.close()
 
 
-def upsert_job(record: Dict[str, Any]) -> None:
-    """Insert or replace a job record (by message_id, role, company combination)."""
+def job_exists(role: str, company: str, location: str = "") -> bool:
+    """Check if a job with identical role, company, and location already exists."""
+    conn = get_connection()
+    cursor = conn.execute(
+        "SELECT 1 FROM jobs WHERE role = ? AND company = ? AND location = ?",
+        (role, company, location)
+    )
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
+
+def update_job_timestamp(role: str, company: str, location: str = "") -> None:
+    """Update the updated_at timestamp for a job without changing other fields."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE jobs SET updated_at = CURRENT_TIMESTAMP WHERE role = ? AND company = ? AND location = ?",
+        (role, company, location)
+    )
+    conn.commit()
+    conn.close()
+
+
+def upsert_job(record: Dict[str, Any]) -> str:
+    """
+    Insert or update a job record. Returns 'new' or 'duplicate'.
+
+    - 'new': Job with same (role, company, location) doesn't exist - inserted
+    - 'duplicate': Job with same (role, company, location) exists - timestamp updated only
+    """
+    role = record.get("role")
+    company = record.get("company")
+    location = record.get("location", "")
+
+    # Check if job already exists by content
+    if job_exists(role, company, location):
+        update_job_timestamp(role, company, location)
+        return "duplicate"
+
+    # New job - try to insert it
     conn = get_connection()
     conn.execute("PRAGMA foreign_keys = ON")
 
-    conn.execute("""
-        INSERT INTO jobs (
-            message_id, sender, date, role, company, location, experience, interested, metadata
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(message_id, role, company) DO UPDATE SET
-            sender = excluded.sender,
-            date = excluded.date,
-            location = excluded.location,
-            experience = excluded.experience,
-            updated_at = CURRENT_TIMESTAMP
-    """, (
-        record.get("message_id"),
-        record.get("sender"),
-        record.get("date"),
-        record.get("role"),
-        record.get("company"),
-        record.get("location", ""),
-        record.get("experience", ""),
-        None,  # interested defaults to NULL (not reviewed)
-        None,  # metadata (can be populated later)
-    ))
-
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("""
+            INSERT INTO jobs (
+                message_id, sender, date, role, company, location, experience, interested, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            record.get("message_id"),
+            record.get("sender"),
+            record.get("date"),
+            record.get("role"),
+            record.get("company"),
+            record.get("location", ""),
+            record.get("experience", ""),
+            None,  # interested defaults to NULL (not reviewed)
+            None,  # metadata (can be populated later)
+        ))
+        conn.commit()
+        conn.close()
+        return "new"
+    except sqlite3.IntegrityError:
+        # UNIQUE constraint on (message_id, role, company) violated
+        # Treat as duplicate and update timestamp
+        conn.close()
+        update_job_timestamp(role, company, location)
+        return "duplicate"
 
 
 def load_jobs_for_export() -> List[Dict[str, Any]]:

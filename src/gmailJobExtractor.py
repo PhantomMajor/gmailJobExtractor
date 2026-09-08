@@ -246,9 +246,15 @@ def main(args):
                 print(f"  {key}: {val}")
         print("\n" + "="*70 + "\n")
 
-    # Commit to DB
+    # Commit to DB and track new vs duplicate
+    new_count = 0
+    duplicate_count = 0
     for record in jobs_to_insert:
-        upsert_job(record)
+        status = upsert_job(record)
+        if status == "new":
+            new_count += 1
+        elif status == "duplicate":
+            duplicate_count += 1
 
     # Mark emails as done
     if processed_msg_ids:
@@ -261,8 +267,10 @@ def main(args):
         ).execute()
 
     all_jobs = load_jobs_for_export()
+    total_parsed = new_count + duplicate_count
     print(f"\nProcessed: {processed} | Unrecognized sender: {skipped_unrecognized} | "
           f"No jobs parsed: {skipped_no_jobs}")
+    print(f"Parsed jobs: {total_parsed} | New: {new_count} | Duplicates: {duplicate_count}")
     print(f"Total job entries in DB: {len(all_jobs)}")
     print(f"Marked {processed} emails with '{DONE_LABEL}' label.")
 
