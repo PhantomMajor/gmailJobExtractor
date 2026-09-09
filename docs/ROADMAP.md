@@ -24,13 +24,8 @@ This roadmap shows the evolution of the job extractor from a CLI tool to a disco
 - [x] Export-to-JSON for portability
 - [x] Schema versioning for future evolution
 
-
-## 🔄 In Progress / Next
-
 ### v1.2 — Local Web Interface (Phase 1)
-**Goal:** See and interact with your extracted jobs locally  
-**Effort:** 4–6 hours  
-**Status:** Design complete; ready to build
+**Goal:** See and interact with your extracted jobs locally
 
 #### Phase 1a: Backend API
 - [x] Flask server + SQLite query layer
@@ -53,34 +48,34 @@ This roadmap shows the evolution of the job extractor from a CLI tool to a disco
 - [x] Interested toggles work and persist (tested toggle and DB verification)
 - [x] Load time <2s for 5k jobs (well under limit with 274 jobs)
 
-## 📋 Planned
-
-### v1.3 — Cloud Deployment (Phase 2)
-**Goal:** Access your job dashboard from anywhere, always-on  
-**Effort:** 3–4 hours  
-**Prerequisites:** Phase 1 complete and validated
+### v1.3 — Cloud Deployment (Phase 2a + 2b)
+**Goal:** Access your job dashboard from anywhere, always-on
 
 #### Phase 2a: Infrastructure
-- [ ] Create Turso database (SQLite-as-a-service)
-- [ ] Export local `jobs.db` to Turso (one-time migration)
-- [ ] Set up `.env` for Turso credentials
-- [ ] Test API against cloud DB
+- [x] Create Turso database (SQLite-as-a-service)
+- [x] Export local `jobs.db` to Turso (one-time migration)
+- [x] Set up `.env` for Turso credentials
+- [x] Test API against cloud DB
 
 #### Phase 2b: Deployment
-- [ ] Convert Flask app to Vercel Serverless Functions
-- [ ] Deploy frontend to Vercel (static hosting)
-- [ ] Configure CORS for cloud-to-cloud calls
-- [ ] Test end-to-end from public URL
+- [x] Deploy Flask app as a single Vercel Python Function (`src/app.py` auto-detected as entrypoint — no `rewrites`/routing config needed; Vercel routes every request to it directly)
+- [x] Serve frontend from the same app (`templates/` + `public/`) — same origin as the API, so **no CORS config needed** (this replaces the original plan of separate static hosting + CORS)
+- [x] Test end-to-end from public URL (`/`, `/api/stats` verified against live Turso data; interested-toggle persistence confirmed)
+
+#### Success Criteria
+- [x] Public URL works (behind Vercel's Deployment Protection/SSO by deliberate choice — see [Open Questions](#open-questions--decisions-pending))
+- [x] Same features as Phase 1 (filter, toggle, stats)
+- [x] No manual intervention after initial deploy — Vercel serves the function on every request automatically
+
+## 🔄 In Progress / Next
+
+### v1.3 — Cloud Deployment (Phase 2c)
+**Goal:** Decide how the local extractor keeps the cloud DB up to date
 
 #### Phase 2c: Sync & Fallback
 - [ ] Decide: Extractor writes to Turso directly OR local DB + cron sync
 - [ ] Document sync strategy
 - [ ] Keep local DB as offline fallback
-
-#### Success Criteria
-- Public URL works from any device
-- Same features as Phase 1 (filter, toggle, stats)
-- No manual intervention after initial setup
 
 ## 🚀 Future Enhancements
 
@@ -134,7 +129,7 @@ This roadmap shows the evolution of the job extractor from a CLI tool to a disco
    - Decision deferred until dataset grows or performance degrades
 
 3. **Authentication in Phase 2:** OAuth2 or simple API key?
-   - Depends on sharing needs; currently not planned
+   - **Decided:** Kept Vercel's built-in Deployment Protection (SSO) instead of building app-level auth. The dashboard has no auth of its own — anyone who can access the URL without a Vercel login could view/toggle jobs — so protection stays on. Tradeoff: viewing from a new device (e.g. phone) requires a Vercel login once. Revisit only if this ever needs sharing with someone outside your Vercel account.
 
 ---
 

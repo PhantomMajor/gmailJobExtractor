@@ -10,6 +10,7 @@ __pycache__/
 credentials.json
 token.json
 .env
+.env.local
 
 # Generated output
 extracted_jobs.json
@@ -22,3 +23,4 @@ jobs.db
 
 # Claude folder
 .claude/
+.vercel

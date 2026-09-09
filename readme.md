@@ -272,6 +272,43 @@ python src/gmailJobExtractor.py
 
 ---
 
+## ☁️ Deploying to Vercel (Cloud Hosting)
+
+Once you've set up Turso (above), you can deploy the dashboard as a single, always-on Vercel Python Function — it serves the API, the HTML page, and the static JS all from `src/app.py`, so there's no separate frontend hosting step and no CORS to configure.
+
+### 1. Install the Vercel CLI and log in
+```bash
+npx vercel login
+```
+
+### 2. Link this folder to a Vercel project
+```bash
+npx vercel link
+```
+Answer the prompts (scope, project name, directory = `./`). This creates a local `.vercel/` folder (gitignored) and a new project on vercel.com — no deploy happens yet.
+
+### 3. Add your Turso credentials as Production environment variables
+```bash
+npx vercel env add DB_TYPE production        # Plain Text — value: turso
+npx vercel env add TURSO_DATABASE_URL production   # Secret — paste from your .env
+npx vercel env add TURSO_AUTH_TOKEN production     # Secret — paste from your .env
+```
+Never put these values in `vercel.json` or any committed file — `vercel.json` is public (it's in this repo), so secrets belong only in Vercel's encrypted env var store.
+
+### 4. Deploy
+```bash
+npx vercel --prod
+```
+Vercel auto-detects `src/app.py` as the Flask entrypoint and routes every request to it — no `rewrites` or routing config needed in `vercel.json`.
+
+### 5. Verify
+Open the printed production URL — the dashboard should load with your real Turso data. Toggle a job's interested state and refresh to confirm it persisted.
+
+### Access control
+By default, new Vercel projects created under a team may have **Deployment Protection (SSO)** enabled — only people logged into that Vercel team can load the URL at all. Since the dashboard itself has no login of its own, this is worth keeping on for a personal deployment (otherwise anyone with the link could view/toggle your jobs). If you want it fully public instead, disable Deployment Protection in Project Settings — just know that removes all access control.
+
+---
+
 ## 🗺 Roadmap (v1.* planned)
 
 Detailed roadmap present [here](docs/ROADMAP.md).
