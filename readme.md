@@ -21,9 +21,12 @@ However, considering the large amount of noise in these emails, I decided to jus
          ├─→ Finds: Role, Company, Location, Experience
          │
          ↓
-┌──────────────────────────┐
-│  jobs.db (SQLite)        │  Structured job data (Database)
-└──────────────────────────┘
+    ┌────────────────────────────────────┐
+    │  Database (DB_TYPE env var)        │
+    ├────────────────────────────────────┤
+    │  ├─ jobs.db (SQLite) — local       │
+    │  └─ Turso cloud — production       │
+    └────────────────────────────────────┘
          ↑
          │
          └─ Emails auto-labeled "delete"
@@ -119,23 +122,106 @@ First run will open your browser asking you to approve access—sign in with you
 Don't have a `JobSearch` label yet? Create one in Gmail (left sidebar → "Create new label" → type "JobSearch"). Then move your job notification emails there.
 
 ### 6. Optional: Use flags for more control
+
+#### Available Flags
+
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `--debug` | Print extracted job records before saving to DB | `python src/gmailJobExtractor.py --debug` |
+| `--export FILE` | Export all jobs from DB to JSON (skips Gmail fetch) | `python src/gmailJobExtractor.py --export jobs.json` |
+| `--db TYPE` | Override `DB_TYPE` env var (useful for one-off runs) | `python src/gmailJobExtractor.py --db turso` |
+
+#### Examples
+
+**Debug mode** — see exactly what was extracted before it's saved:
 ```bash
-python src/gmailJobExtractor.py --debug        # Show what the script extracted before saving
-python src/gmailJobExtractor.py --export out.json  # Save all jobs to a JSON file
+python src/gmailJobExtractor.py --debug
+```
+Output shows all parsed jobs with their fields (role, company, location, experience) before they hit the database.
+
+**Export to JSON** — dump all jobs from the database to a file (no Gmail fetch):
+```bash
+python src/gmailJobExtractor.py --export jobs.json
+```
+Useful for backups, sharing, or data analysis. Creates a JSON file with all extracted jobs.
+
+**Override database backend** — use Turso for a single run even if `DB_TYPE=sqlite`:
+```bash
+python src/gmailJobExtractor.py --db turso
+```
+Helpful for testing Turso without permanently changing `DB_TYPE` env var.
+
+**Combine flags** — extract with Turso and show debug output:
+```bash
+python src/gmailJobExtractor.py --db turso --debug
+```
+
+---
+
+## 🗄️ Database Configuration
+
+By default, jobs are stored in a local SQLite database (`jobs.db`). You can also use Turso cloud for production deployments.
+
+### Local SQLite (Default)
+**Best for:** Local development, single-user setup
+
+No extra setup needed. Jobs are stored in `jobs.db`:
+```bash
+python src/gmailJobExtractor.py
+python run.py
+```
+
+### Turso Cloud Database
+**Best for:** Production, multi-device access, cloud deployments (e.g., Vercel)
+
+#### Prerequisites
+1. Sign up for [Turso](https://turso.tech) (free tier available)
+2. Create a database and get your credentials:
+   - `TURSO_DATABASE_URL` — your database URL
+   - `TURSO_AUTH_TOKEN` — your auth token
+
+#### Using Turso
+**Local development:**
+```bash
+export DB_TYPE=turso
+export TURSO_DATABASE_URL=<your-url>
+export TURSO_AUTH_TOKEN=<your-token>
+
+python src/gmailJobExtractor.py
+python run.py
+```
+
+**Vercel deployment:**
+Add these to your environment variables in Vercel project settings:
+```
+DB_TYPE=turso
+TURSO_DATABASE_URL=<your-url>
+TURSO_AUTH_TOKEN=<your-token>
 ```
 
 ---
 
 ## 💼 Job Dashboard - Web Interface
 
-Once you have jobs extracted to `jobs.db`, you can browse them in an interactive web dashboard.
+Once you have jobs extracted, you can browse them in an interactive web dashboard. The dashboard works with both SQLite and Turso backends (no code changes needed).
 
 ### Running the Dashboard
 
 #### 1. Start the Flask server
+
+**Local SQLite:**
 ```bash
 python run.py
 ```
+
+**With Turso:**
+```bash
+export DB_TYPE=turso
+export TURSO_DATABASE_URL=<your-url>
+export TURSO_AUTH_TOKEN=<your-token>
+python run.py
+```
+
 The server will start on `http://localhost:5000`. Open your browser and navigate there to see the dashboard.
 
 #### 2. Stop the server
@@ -155,7 +241,8 @@ Press `Ctrl+C` in the terminal
 
 ### How it works
 
-- **Backend**: Flask (Python) web server with SQLite database
+- **Server**: Flask (Python) web server
+- **Database**: SQLite (local) or Turso (cloud) — configured via `DB_TYPE` env var
 - **Frontend**: Vanilla HTML + JavaScript (zero dependencies, no build step)
 - **API**: Simple REST endpoints (GET jobs, GET stats, POST to toggle interested)
 

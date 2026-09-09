@@ -3,3 +3,5 @@ google-auth-oauthlib==1.2.1
 google-api-python-client==2.149.0
 beautifulsoup4==4.12.3
 Flask==3.0.0
+libsql-client==0.3.0
+python-dotenv==1.0.0

@@ -34,13 +34,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from bs4 import BeautifulSoup
+from google.auth.transport.requests import Request  # pyrefly: ignore [missing-import]
+from google.oauth2.credentials import Credentials  # pyrefly: ignore [missing-import]
+from google_auth_oauthlib.flow import InstalledAppFlow  # pyrefly: ignore [missing-import]
+from googleapiclient.discovery import build  # pyrefly: ignore [missing-import]
+from bs4 import BeautifulSoup  # pyrefly: ignore [missing-import]
 
-from db import init_db, upsert_job, load_jobs_for_export, export_to_json, get_existing_message_ids
+from db import init_db, upsert_job, load_jobs_for_export, export_to_json
 from parsers import parse_linkedin, parse_hirist, parse_naukri
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
@@ -279,5 +279,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract jobs from Gmail JobSearch emails")
     parser.add_argument("--debug", action="store_true", help="Print extracted records before committing to DB")
     parser.add_argument("--export", metavar="FILE", help="Export all jobs to JSON file (no Gmail fetch)")
+    parser.add_argument("--db", choices=["sqlite", "turso"], help="Override DB_TYPE env var (sqlite or turso)")
     args = parser.parse_args()
+    if args.db:
+        os.environ["DB_TYPE"] = args.db
     main(args)

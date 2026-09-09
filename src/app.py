@@ -1,18 +1,25 @@
 """
 Flask web app for browsing and managing extracted jobs.
 Serves API endpoints and static frontend.
+Auto-detects Turso cloud (TURSO_DATABASE_URL) vs local SQLite.
 """
 
-# pyrefly: ignore [missing-import]
-from flask import Flask, render_template, request, jsonify
+import sys
 from pathlib import Path
+
+from flask import Flask, render_template, request, jsonify  # pyrefly: ignore [missing-import]
+
+# Note: .env is loaded by Vercel deployment; for local dev, set TURSO_* env vars explicitly if needed
+# Add src directory to path for sibling imports
+sys.path.insert(0, str(Path(__file__).parent))
+
 import db
 
 app = Flask(
     __name__,
     template_folder=str(Path(__file__).parent.parent / "templates"),
-    static_folder=str(Path(__file__).parent.parent / "static"),
-    static_url_path="/static"
+    static_folder=str(Path(__file__).parent.parent / "public"),
+    static_url_path=""
 )
 
 

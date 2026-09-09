@@ -9,6 +9,7 @@ __pycache__/
 # Sensitive credentials
 credentials.json
 token.json
+.env
 
 # Generated output
 extracted_jobs.json

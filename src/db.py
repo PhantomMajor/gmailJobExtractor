@@ -1,14 +1,45 @@
 """
-Database operations for job extraction.
-Handles SQLite schema initialization and CRUD operations.
+Database operations for job extraction and web queries.
+Backend: local SQLite or Turso cloud (configured via DB_TYPE env var).
+
+Configuration:
+  DB_TYPE=sqlite (default): Use local SQLite database (jobs.db)
+  DB_TYPE=turso: Use Turso cloud database (requires TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)
 """
 
 import sqlite3
 import json
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 DB_FILE = "jobs.db"
+
+# Configuration
+DB_TYPE = os.getenv("DB_TYPE", "sqlite").lower()
+if DB_TYPE not in ("sqlite", "turso"):
+    raise ValueError(f"Invalid DB_TYPE: {DB_TYPE}. Use 'sqlite' or 'turso'")
+
+if DB_TYPE == "turso":
+    url = os.getenv("TURSO_DATABASE_URL")
+    token = os.getenv("TURSO_AUTH_TOKEN")
+    if not url or not token:
+        raise ValueError("DB_TYPE=turso requires TURSO_DATABASE_URL and TURSO_AUTH_TOKEN env vars")
+
+# Lazy imports for optional Turso support
+_turso_client = None
+
+def _get_turso_client():
+    """Lazily initialize and cache Turso client."""
+    global _turso_client
+    if _turso_client is None:
+        from libsql_client import create_client_sync  # pyrefly: ignore [missing-import]
+        url = os.getenv("TURSO_DATABASE_URL")
+        token = os.getenv("TURSO_AUTH_TOKEN")
+        if not url or not token:
+            raise ValueError("TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be set")
+        _turso_client = create_client_sync(url=url, auth_token=token)
+    return _turso_client
 
 
 def get_connection():
@@ -156,138 +187,151 @@ def get_existing_message_ids() -> set:
     return ids
 
 
+# ---------------------------------------------------------------------------
+# Web API Functions
+# ---------------------------------------------------------------------------
+
 def get_jobs(company: Optional[str] = None, interested_only: bool = False) -> List[Dict[str, Any]]:
-    """
-    Fetch jobs with optional filters for the web interface and API.
-    
-    Supports case-insensitive partial company search and filtering by interested status.
-    Uses parameterized queries to prevent SQL injection.
-    """
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row  # Access columns by name
+    """Fetch jobs with optional filters for the web interface."""
+    if DB_TYPE == "turso":
+        client = _get_turso_client()
+        query = "SELECT id, message_id, sender, date, role, company, location, experience, interested FROM jobs WHERE 1=1"
+        params = []
+        if company:
+            query += " AND company LIKE ?"
+            params.append(f"%{company}%")
+        if interested_only:
+            query += " AND interested = 1"
+        query += " ORDER BY extracted_at DESC"
 
-    # Base query: 1=1 allows dynamic AND clauses to be appended cleanly
-    query = "SELECT id, message_id, sender, date, role, company, location, experience, interested FROM jobs WHERE 1=1"
-    params = []
+        result = client.execute(query, params)
+        jobs = []
+        for row in result.rows:
+            jobs.append({
+                "id": row[0], "message_id": row[1], "sender": row[2], "date": row[3],
+                "role": row[4], "company": row[5], "location": row[6],
+                "experience": row[7], "interested": row[8],
+            })
+        return jobs
+    else:
+        # Local SQLite
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        query = "SELECT id, message_id, sender, date, role, company, location, experience, interested FROM jobs WHERE 1=1"
+        params = []
+        if company:
+            query += " AND company LIKE ?"
+            params.append(f"%{company}%")
+        if interested_only:
+            query += " AND interested = 1"
+        query += " ORDER BY extracted_at DESC"
 
-    # Optional filter: partial match on company name (e.g., 'Google' matches 'Google Inc')
-    if company:
-        query += " AND company LIKE ?"
-        params.append(f"%{company}%")
-
-    # Optional filter: only show bookmarked / interested jobs
-    if interested_only:
-        query += " AND interested = 1"
-
-    # Always show most recently extracted jobs first
-    query += " ORDER BY extracted_at DESC"
-
-    cursor = conn.execute(query, params)
-    jobs = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return jobs
+        cursor = conn.execute(query, params)
+        jobs = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return jobs
 
 
 def get_stats() -> Dict[str, Any]:
-    """
-    Compute aggregate summary metrics for the dashboard header.
-    
-    Returns total jobs count, distinct company count, interested count,
-    and the top 5 companies by posting volume.
-    """
-    conn = get_connection()
-    conn.row_factory = sqlite3.Row
+    """Get aggregate job statistics."""
+    if DB_TYPE == "turso":
+        client = _get_turso_client()
+        total = client.execute("SELECT COUNT(*) FROM jobs").rows[0][0] if client.execute("SELECT COUNT(*) FROM jobs").rows else 0
+        companies = client.execute("SELECT COUNT(DISTINCT company) FROM jobs").rows[0][0] if client.execute("SELECT COUNT(DISTINCT company) FROM jobs").rows else 0
+        interested = client.execute("SELECT COUNT(*) FROM jobs WHERE interested = 1").rows[0][0] if client.execute("SELECT COUNT(*) FROM jobs WHERE interested = 1").rows else 0
 
-    # Aggregate counts across the entire jobs table
-    total = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-    companies = conn.execute("SELECT COUNT(DISTINCT company) FROM jobs").fetchone()[0]
-    interested = conn.execute("SELECT COUNT(*) FROM jobs WHERE interested = 1").fetchone()[0]
+        top_companies_result = client.execute("""
+            SELECT company, COUNT(*) as count FROM jobs GROUP BY company ORDER BY count DESC LIMIT 5
+        """)
+        top_companies = [{"company": row[0], "count": row[1]} for row in top_companies_result.rows]
 
-    # Top 5 companies by number of job postings
-    top_companies = conn.execute("""
-        SELECT company, COUNT(*) as count
-        FROM jobs
-        GROUP BY company
-        ORDER BY count DESC
-        LIMIT 5
-    """).fetchall()
-
-    conn.close()
-
-    return {
-        "total_jobs": total,
-        "unique_companies": companies,
-        "interested_count": interested,
-        "top_companies": [dict(row) for row in top_companies]
-    }
-
-
-def toggle_interested(job_id: int) -> Optional[int]:
-    """
-    Cycle through interested states: NULL -> 1 -> 0 -> 1 -> 0 -> ...
-
-    Once a user touches a job (first click from NULL), it never returns to NULL.
-    It toggles between 1 (interested) and 0 (not interested).
-
-    Returns:
-        1: Job marked interested
-        0: Job marked not interested
-        None: Job ID not found
-    """
-    conn = get_connection()
-
-    # Verify job exists before updating
-    cursor = conn.execute("SELECT interested FROM jobs WHERE id = ?", (job_id,))
-    row = cursor.fetchone()
-    if not row:
+        return {
+            "total_jobs": total,
+            "unique_companies": companies,
+            "interested_count": interested,
+            "top_companies": top_companies
+        }
+    else:
+        # Local SQLite
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        total = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        companies = conn.execute("SELECT COUNT(DISTINCT company) FROM jobs").fetchone()[0]
+        interested = conn.execute("SELECT COUNT(*) FROM jobs WHERE interested = 1").fetchone()[0]
+        top_companies = conn.execute("""
+            SELECT company, COUNT(*) as count FROM jobs GROUP BY company ORDER BY count DESC LIMIT 5
+        """).fetchall()
         conn.close()
-        return None
 
-    # Cycle: NULL -> 1, then toggle between 1 and 0
-    current = row[0]
-    if current is None:
-        new_state = 1  # NULL (untouched) -> 1 (interested)
-    elif current == 1:
-        new_state = 0  # 1 (interested) -> 0 (not interested)
-    else:  # current == 0
-        new_state = 1  # 0 (not interested) -> 1 (interested)
-
-    conn.execute(
-        "UPDATE jobs SET interested = ? WHERE id = ?",
-        (new_state, job_id)
-    )
-    conn.commit()
-    conn.close()
-
-    return new_state
+        return {
+            "total_jobs": total,
+            "unique_companies": companies,
+            "interested_count": interested,
+            "top_companies": [dict(row) for row in top_companies]
+        }
 
 
 def set_interested(job_id: int, new_state: Optional[int]) -> Optional[int]:
-    """
-    Set interested state for a job directly.
-
-    Args:
-        job_id: The job ID to update
-        new_state: 1 (interested), 0 (not interested), or None (not evaluated)
-
-    Returns:
-        The new state: 1, 0, or None
-        None if job not found
-    """
-    conn = get_connection()
-
-    # Verify job exists before updating
-    cursor = conn.execute("SELECT interested FROM jobs WHERE id = ?", (job_id,))
-    row = cursor.fetchone()
-    if not row:
+    """Set interested state for a job directly."""
+    if DB_TYPE == "turso":
+        client = _get_turso_client()
+        result = client.execute("SELECT interested FROM jobs WHERE id = ?", [job_id])
+        if not result.rows:
+            return None
+        client.execute(
+            "UPDATE jobs SET interested = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [new_state, job_id]
+        )
+        return new_state
+    else:
+        # Local SQLite
+        conn = get_connection()
+        cursor = conn.execute("SELECT interested FROM jobs WHERE id = ?", (job_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return None
+        conn.execute(
+            "UPDATE jobs SET interested = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_state, job_id)
+        )
+        conn.commit()
         conn.close()
-        return None
+        return new_state
 
-    conn.execute(
-        "UPDATE jobs SET interested = ? WHERE id = ?",
-        (new_state, job_id)
-    )
-    conn.commit()
-    conn.close()
 
-    return new_state
+def toggle_interested(job_id: int) -> Optional[int]:
+    """Cycle through interested states: NULL -> 1 -> 0 -> 1 -> 0 -> ..."""
+    if DB_TYPE == "turso":
+        client = _get_turso_client()
+        result = client.execute("SELECT interested FROM jobs WHERE id = ?", [job_id])
+        if not result.rows:
+            return None
+
+        current = result.rows[0][0]
+        new_state = 1 if (current is None or current == 0) else 0
+
+        client.execute(
+            "UPDATE jobs SET interested = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [new_state, job_id]
+        )
+        return new_state
+    else:
+        # Local SQLite
+        conn = get_connection()
+        cursor = conn.execute("SELECT interested FROM jobs WHERE id = ?", (job_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return None
+
+        current = row[0]
+        new_state = 1 if (current is None or current == 0) else 0
+
+        conn.execute(
+            "UPDATE jobs SET interested = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_state, job_id)
+        )
+        conn.commit()
+        conn.close()
+        return new_state
+
