@@ -1,10 +1,11 @@
 """
 Flask web app for browsing and managing extracted jobs.
 Serves API endpoints and static frontend.
-Auto-detects Turso cloud (TURSO_DATABASE_URL) vs local SQLite.
+Uses DB_TYPE env var to select backend (sqlite or turso).
 """
 
 import sys
+import traceback
 from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify  # pyrefly: ignore [missing-import]
@@ -40,6 +41,8 @@ def api_jobs():
         return jsonify({"jobs": jobs}), 200
 
     except Exception as e:
+        print(f"ERROR in /api/jobs: {e}")
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -50,6 +53,8 @@ def api_stats():
         stats = db.get_stats()
         return jsonify(stats), 200
     except Exception as e:
+        print(f"ERROR in /api/stats: {e}")
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 

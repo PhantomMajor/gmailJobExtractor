@@ -209,12 +209,19 @@ Once you have jobs extracted, you can browse them in an interactive web dashboar
 
 #### 1. Start the Flask server
 
-**Local SQLite:**
+**Local SQLite (default):**
 ```bash
 python run.py
 ```
 
-**With Turso:**
+**With Turso (using flag):**
+```bash
+export TURSO_DATABASE_URL=<your-url>
+export TURSO_AUTH_TOKEN=<your-token>
+python run.py --db turso
+```
+
+**With Turso (using env var):**
 ```bash
 export DB_TYPE=turso
 export TURSO_DATABASE_URL=<your-url>
